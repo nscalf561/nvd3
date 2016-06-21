@@ -6632,8 +6632,10 @@ nv.models.lineChart = function() {
     //------------------------------------------------------------
 
     var lines = nv.models.line()
+        // , lines02 = nv.models.line()     //NOTE added, but not sure if it's necessary yet.  Leaning towards yes!
         , xAxis = nv.models.axis()
         , yAxis = nv.models.axis()
+        , yAxis02 = nv.models.axis()    //NOTE added
         , legend = nv.models.legend()
         , interactiveLayer = nv.interactiveGuideline()
         , tooltip = nv.models.tooltip()
@@ -6648,10 +6650,11 @@ nv.models.lineChart = function() {
         , legendPosition = 'top'
         , showXAxis = true
         , showYAxis = true
-        , rightAlignYAxis = false
+        // , rightAlignYAxis = false
         , useInteractiveGuideline = false
         , x
         , y
+        , y02   //NOTE added
         , focusEnable = false
         , state = nv.utils.state()
         , defaultState = null
@@ -6659,10 +6662,10 @@ nv.models.lineChart = function() {
         , dispatch = d3.dispatch('tooltipShow', 'tooltipHide', 'stateChange', 'changeState', 'renderEnd')
         , duration = 250
         ;
-
     // set options on sub-objects for this chart
     xAxis.orient('bottom').tickPadding(7);
-    yAxis.orient(rightAlignYAxis ? 'right' : 'left');
+    yAxis.orient('left');
+    yAxis02.orient('right');    //NOTE added
 
     lines.clipEdge(true).duration(0);
 
@@ -6707,6 +6710,10 @@ nv.models.lineChart = function() {
         renderWatch.models(lines);
         if (showXAxis) renderWatch.models(xAxis);
         if (showYAxis) renderWatch.models(yAxis);
+        if (showYAxis) renderWatch.models(yAxis02);     //NOTE added this for consistency's sake, likely going to comment out the whole renderWatch system
+                                                        // to make debugging and testing easier ---> not quite sure what role it plays
+
+        //NOTE it might be necessary to remove renderwatch --- this is what was done of the multibar example
 
         selection.each(function(data) {
             var container = d3.select(this);
@@ -6752,6 +6759,7 @@ nv.models.lineChart = function() {
             // Setup Scales
             x = lines.xScale();
             y = lines.yScale();
+            y02 = lines.yScale();    //NOTE added
 
             // Setup containers and skeleton of chart
             var wrap = container.selectAll('g.nv-wrap.nv-lineChart').data([data]);
@@ -6795,10 +6803,12 @@ nv.models.lineChart = function() {
 
             wrap.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-            if (rightAlignYAxis) {
-                g.select(".nv-y.nv-axis")
-                    .attr("transform", "translate(" + availableWidth + ",0)");
-            }
+                //NOTE commented out the below sections, we will not be using rightAlignYAxis in the first iteration because the
+                // second y axis will always be the right value
+            // if (rightAlignYAxis) {
+            //     g.select(".nv-y.nv-axis")
+            //         .attr("transform", "translate(" + availableWidth + ",0)");
+            // }
 
             //Set up interactive layer
             if (useInteractiveGuideline) {
@@ -6827,41 +6837,53 @@ nv.models.lineChart = function() {
 
 
             // Setup Main (Focus) Axes
-            if (showXAxis) {
+            // if (showXAxis) {
                 xAxis
                     .scale(x)
                     ._ticks(nv.utils.calcTicksX(availableWidth/100, data) )
                     .tickSize(-availableHeight, 0);
-            }
+            // }
 
-            if (showYAxis) {
+            // if (showYAxis) {
                 yAxis
                     .scale(y)
                     ._ticks( nv.utils.calcTicksY(availableHeight/36, data) )
                     .tickSize( -availableWidth, 0);
-            }
+            // }
 
+                //NOTE added yAxis02
+                yAxis02
+                    .scale(y02)
+                    ._ticks( nv.utils.calcTicksY(availableHeight/36, data) )
+                    .tickSize( -availableWidth, 0);
             //============================================================
             // Update Axes
             //============================================================
             function updateXAxis() {
-              if(showXAxis) {
+              // if(showXAxis) {    //NOTE removed logic for showXAxis, not going to use that for the first iteration
                 g.select('.nv-focus .nv-x.nv-axis')
                   .transition()
                   .duration(duration)
                   .call(xAxis)
                 ;
-              }
+              // }
             }
 
             function updateYAxis() {
-              if(showYAxis) {
+              // if(showYAxis) {    //NOTE removed the logic for showYAxis, not going to use that in the first iteration
                 g.select('.nv-focus .nv-y.nv-axis')
                   .transition()
                   .duration(duration)
                   .call(yAxis)
                 ;
-              }
+              // }
+
+                //NOTE added
+                g.select('.nv-focus .nv-y02.nv-axis')
+                  .transition()
+                  .duration(duration)
+                  .call(yAxis02)
+                ;
             }
             
             g.select('.nv-focus .nv-x.nv-axis')
@@ -6871,9 +6893,9 @@ nv.models.lineChart = function() {
             // Update Focus
             //============================================================
             if(!focusEnable) {
-                linesWrap.call(lines);
+                linesWrap.call(lines);  //NOTE uses the 'lines' object, may have to use lines02 here in some way
                 updateXAxis();
-                updateYAxis();
+                updateYAxis();  //NOTE will update both y axes, see code below
             } else {
                 focus.width(availableWidth);
                 g.select('.nv-focusWrap')
@@ -6897,7 +6919,7 @@ nv.models.lineChart = function() {
             });
 
             interactiveLayer.dispatch.on('elementMousemove', function(e) {
-                lines.clearHighlights();
+                lines.clearHighlights();    //NOTE draws from the lines object, may have to use lines02 as well here
                 var singlePoint, pointIndex, pointXLocation, allData = [];
                 data
                     .filter(function(series, i) {
@@ -6910,7 +6932,7 @@ nv.models.lineChart = function() {
                             return lines.x()(d,i) >= extent[0] && lines.x()(d,i) <= extent[1];
                         });
 
-                        pointIndex = nv.interactiveBisect(currentValues, e.pointXValue, lines.x());
+                        pointIndex = nv.interactiveBisect(currentValues, e.pointXValue, lines.x());     //NOTE again, uses lines.  check back later for lines02
                         var point = currentValues[pointIndex];
                         var pointYValue = chart.y()(point, pointIndex);
                         if (pointYValue !== null) {
@@ -6928,7 +6950,7 @@ nv.models.lineChart = function() {
                     });
                 //Highlight the tooltip entry based on which point the mouse is closest to.
                 if (allData.length > 2) {
-                    var yValue = chart.yScale().invert(e.mouseY);
+                    var yValue = chart.yScale().invert(e.mouseY);   //NOTE yValue?  uses yScale, should there be a call for the 02 axis?
                     var domainExtent = Math.abs(chart.yScale().domain()[0] - chart.yScale().domain()[1]);
                     var threshold = 0.03 * domainExtent;
                     var indexToHighlight = nv.nearestValueIndex(allData.map(function(d){return d.value;}),yValue,threshold);
@@ -6937,7 +6959,7 @@ nv.models.lineChart = function() {
                 }
 
                 var defaultValueFormatter = function(d,i) {
-                    return d == null ? "N/A" : yAxis.tickFormat()(d);
+                    return d == null ? "N/A" : yAxis.tickFormat()(d);   //NOTE yAxis tick format default here, should there be a yAxis02?
                 };
 
                 interactiveLayer.tooltip
@@ -6964,7 +6986,8 @@ nv.models.lineChart = function() {
                     var point = series.values[pointIndex];
                     if (typeof point === 'undefined') return;
                     if (typeof pointXLocation === 'undefined') pointXLocation = chart.xScale()(chart.x()(point,pointIndex));
-                    var yPos = chart.yScale()(chart.y()(point,pointIndex));
+                    var yPos = chart.yScale()(chart.y()(point,pointIndex));     //NOTE y position for the interactive layer, there should be some update to include the second
+                                                                                // axis, but the interactive layer may be a whole beast on it's own --- not mvp
                     allData.push({
                         point: point,
                         pointIndex: pointIndex,
@@ -6974,11 +6997,11 @@ nv.models.lineChart = function() {
                     });
                 });
 
-                lines.dispatch.elementClick(allData);
+                lines.dispatch.elementClick(allData);   //NOTE lines used here, lines02, etc.
             });
 
             interactiveLayer.dispatch.on("elementMouseout",function(e) {
-                lines.clearHighlights();
+                lines.clearHighlights();    //NOTE lines here again, interactive layer, lines 02, yada yada
             });
 
             /* Update `main' graph on brush update. */
@@ -7034,7 +7057,8 @@ nv.models.lineChart = function() {
                             };
                         })
                 );
-                focusLinesWrap.transition().duration(duration).call(lines);
+                focusLinesWrap.transition().duration(duration).call(lines);     //NOTE IMPORTANT this uses lines to define the focus, a key feature.  This should also include
+                                                                                // lines02 in the focus.
     
                 // Update Main (Focus) Axes
                 updateXAxis();
@@ -7068,12 +7092,14 @@ nv.models.lineChart = function() {
     // expose chart's sub-components
     chart.dispatch = dispatch;
     chart.lines = lines;
+    // chart.lines02 = lines02;     //NOTE will likely have to add a lines02 object
     chart.legend = legend;
     chart.focus = focus;
     chart.xAxis = xAxis;
     chart.x2Axis = focus.xAxis
     chart.yAxis = yAxis;
-    chart.y2Axis = focus.yAxis
+    chart.y2Axis = focus.yAxis;
+    chart.yAxis02 = yAxis02; //NOTE added
     chart.interactiveLayer = interactiveLayer;
     chart.tooltip = tooltip;
     chart.state = state;
@@ -7088,6 +7114,7 @@ nv.models.lineChart = function() {
         legendPosition: {get: function(){return legendPosition;}, set: function(_){legendPosition=_;}},
         showXAxis:      {get: function(){return showXAxis;}, set: function(_){showXAxis=_;}},
         showYAxis:    {get: function(){return showYAxis;}, set: function(_){showYAxis=_;}},
+        // showYAxis02:    {get: function(){return showYAxis02;}, set: function(_){showYAxis02=_;}}, //NOTE not so sure we need this one
         defaultState:    {get: function(){return defaultState;}, set: function(_){defaultState=_;}},
         noData:    {get: function(){return noData;}, set: function(_){noData=_;}},
         // Focus options, mostly passed onto focus model.
@@ -7142,6 +7169,7 @@ nv.models.lineChart = function() {
         }},
         y: {get: function(){return lines.y();}, set: function(_){
             lines.y(_);
+            // lines02.y(_); //NOTE again, likely going to implement a lines02
             focus.y(_);
         }},
         rightAlignYAxis: {get: function(){return rightAlignYAxis;}, set: function(_){
@@ -7152,12 +7180,14 @@ nv.models.lineChart = function() {
             useInteractiveGuideline = _;
             if (useInteractiveGuideline) {
                 lines.interactive(false);
+                // lines02.interactive(false);  //NOTE lines02 to be added
                 lines.useVoronoi(false);
+                // liens02.useVoronoi(false);   //NOTE lines02 to be added
             }
         }}
     });
 
-    nv.utils.inheritOptions(chart, lines);
+    nv.utils.inheritOptions(chart, lines);  //NOTE uses lines, no clear indication of how to impliment a lines02
     nv.utils.initOptions(chart);
 
     return chart;
